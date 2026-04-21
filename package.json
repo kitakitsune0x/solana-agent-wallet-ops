@@ -1,6 +1,6 @@
 {
   "name": "solana-agent-wallet-ops",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "General-purpose Solana wallet operations toolkit for agentic workflows.",
   "type": "module",
   "packageManager": "pnpm@8.15.1",
