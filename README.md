@@ -23,6 +23,7 @@ This is not a consumer wallet app, not a GUI, and not tied to a single host such
 - Bulk transfers with preview-first behavior
   - SOL transfers by default
   - SPL token transfers when `--mint <TOKEN_MINT>` is provided
+- SplitNOW integration for multi-wallet quote, order, and status workflows
 - Devnet and mainnet-beta support
 - Explicit `--execute` guard for real sends
 - Dry-run friendly planning output
@@ -114,6 +115,31 @@ Preview an SPL token distribution:
 pnpm tsx src/cli/bulk-transfer.ts --from-set treasury --to-csv ./token-recipients.csv --mint <TOKEN_MINT> --dry-run
 ```
 
+Create a SplitNOW quote for splitting SOL across Solana wallets:
+
+```bash
+export SPLITNOW_API_KEY="YOUR_SPLITNOW_API_KEY"
+pnpm tsx src/cli/splitnow-quote.ts --from-amount 10 --from-asset-id sol --from-network-id solana
+```
+
+Preview a SplitNOW order from an existing quote into a wallet set:
+
+```bash
+pnpm tsx src/cli/splitnow-order.ts --quote-id QUOTE123 --to-set campaign
+```
+
+Create the real SplitNOW order after review:
+
+```bash
+pnpm tsx src/cli/splitnow-order.ts --quote-id QUOTE123 --to-set campaign --execute
+```
+
+Track SplitNOW order status:
+
+```bash
+pnpm tsx src/cli/splitnow-status.ts --order-id ABC123
+```
+
 Notes for CSV recipient input:
 
 - If the CSV includes an `amount` column, per-row amounts are used.
@@ -129,6 +155,7 @@ Storage path overrides:
 - CLI override: `--db-path <path>`
 - env override: `SAWO_DB_PATH=/path/to/wallets.sqlite`
 - repo-local DBs are rejected unless you pass `--allow-repo-db` or set `SAWO_ALLOW_REPO_DB=1`
+- SplitNOW API key: `SPLITNOW_API_KEY=...`
 
 ## Storage Format
 
@@ -166,12 +193,14 @@ See [docs/storage-format.md](docs/storage-format.md) for examples.
 - Secret-bearing storage defaults outside the repo at `~/.solana-agent-wallet-ops/wallets.sqlite`.
 - Repo-local DB paths are blocked unless you opt in with `--allow-repo-db` or `SAWO_ALLOW_REPO_DB=1`.
 - SQLite improves structure and performance. It does not encrypt private keys.
+- SplitNOW API keys should stay in environment variables or untracked local files, not in the repo or shell history.
 - Commands do not print secret keys unless `--show-secrets` is explicitly passed.
 - CSV exports never contain secrets.
 - Real transfers require `--execute`.
 - Transfer commands print a plan before sending.
 - Use devnet first.
 - For SPL transfers, the sender still needs SOL to pay transaction fees and any associated token account creation rent for recipients that do not already have one.
+- SplitNOW order creation only becomes funded after you send the requested deposit. Review the quote, exchanger, and recipient split first.
 
 More detail: [docs/safety.md](docs/safety.md)
 
@@ -182,6 +211,7 @@ More detail: [docs/safety.md](docs/safety.md)
 - Secret-bearing storage defaults outside the repo because `gitignore` is not a security boundary.
 - Wallet-set storage is asset-agnostic; SOL and SPL behavior is chosen at command time.
 - SPL support is intentionally mint-driven instead of symbol-driven. The CLI fetches mint decimals on-chain and derives associated token accounts deterministically.
+- SplitNOW integration is isolated in its own client and CLI commands so agent workflows can use quotes/orders without coupling the core wallet-storage path to a third-party exchange.
 - Transfer execution is serial in v1 so failures are easier to reason about and partial completion is visible.
 
 ## End-to-End Test Flow
@@ -223,6 +253,16 @@ pnpm tsx src/cli/balances.ts --set test-set --mint <DEVNET_TOKEN_MINT>
 pnpm tsx src/cli/bulk-transfer.ts --from-set test-set --to-csv ./token-recipients.csv --mint <DEVNET_TOKEN_MINT> --dry-run
 ```
 
+7. For SplitNOW testing, create a quote, preview the order payload, then create the order:
+
+```bash
+export SPLITNOW_API_KEY="YOUR_SPLITNOW_API_KEY"
+pnpm tsx src/cli/splitnow-quote.ts --from-amount 10 --from-asset-id sol --from-network-id solana
+pnpm tsx src/cli/splitnow-order.ts --quote-id <QUOTE_ID> --to-set test-set
+pnpm tsx src/cli/splitnow-order.ts --quote-id <QUOTE_ID> --to-set test-set --execute
+pnpm tsx src/cli/splitnow-status.ts --order-id <ORDER_ID>
+```
+
 ## Future Improvements
 
 - Optional at-rest encryption for local wallet storage
@@ -230,3 +270,4 @@ pnpm tsx src/cli/bulk-transfer.ts --from-set test-set --to-csv ./token-recipient
 - Configurable concurrency for read-only RPC calls
 - Better structured output modes for automation (`json`, exit codes by failure class)
 - SPL token account discovery beyond the associated token account path
+- SplitNOW quote caching and exchanger-selection strategies beyond `best`

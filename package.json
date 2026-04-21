@@ -9,11 +9,15 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test test/**/*.test.ts",
     "create-wallets": "tsx src/cli/create-wallets.ts",
     "list-wallets": "tsx src/cli/list-wallets.ts",
     "balances": "tsx src/cli/balances.ts",
     "export-addresses": "tsx src/cli/export-addresses.ts",
-    "bulk-transfer": "tsx src/cli/bulk-transfer.ts"
+    "bulk-transfer": "tsx src/cli/bulk-transfer.ts",
+    "splitnow-quote": "tsx src/cli/splitnow-quote.ts",
+    "splitnow-order": "tsx src/cli/splitnow-order.ts",
+    "splitnow-status": "tsx src/cli/splitnow-status.ts"
   },
   "dependencies": {
     "@solana/spl-token": "^0.4.13",

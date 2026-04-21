@@ -42,6 +42,16 @@ export function parsePositiveInteger(value: string, fieldName: string): number {
   return parsed;
 }
 
+export function parsePositiveNumber(value: string, fieldName: string): number {
+  const parsed = Number.parseFloat(value);
+
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    throw new Error(`${fieldName} must be a positive number.`);
+  }
+
+  return parsed;
+}
+
 export function parseAmountToBaseUnits(value: string, decimals: number, fieldName: string): number {
   if (!Number.isInteger(decimals) || decimals < 0 || decimals > 18) {
     throw new Error(`Invalid decimals for ${fieldName}: ${decimals}`);

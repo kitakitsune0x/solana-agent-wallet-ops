@@ -17,6 +17,7 @@ Why this matters:
 - shell history can leak arguments and pasted output
 - CI logs and debugging sessions often persist longer than intended
 - `gitignore` does not protect you if secrets are written into tracked locations elsewhere
+- third-party API keys can be abused long before you notice a leak
 
 Because of that, the toolkit:
 
@@ -24,6 +25,7 @@ Because of that, the toolkit:
 - only reveals secrets when `--show-secrets` is explicitly passed
 - never exports secrets to CSV
 - rejects repo-local DB paths unless `--allow-repo-db` or `SAWO_ALLOW_REPO_DB=1` is set intentionally
+- expects `SPLITNOW_API_KEY` to come from your local environment instead of a tracked file
 
 SQLite is a storage engine, not encryption. If the DB file is compromised, the secrets inside it are compromised too.
 
@@ -66,6 +68,9 @@ Recommended operating discipline:
 - use separate wallet sets for treasury, recipients, and experiments
 - do not assume a token mint is correct; verify the mint address directly
 - remember that SPL transfers still require SOL for fees, and sometimes for recipient associated token account creation
+- do not put SplitNOW API keys on the command line if shell history is persisted on your machine
+- confirm the selected SplitNOW exchanger and recipient percentages before creating an order
+- remember that SplitNOW order creation is external state even before the deposit is funded
 
 If you intentionally override storage into the repo, treat that as an exception that needs a deliberate reason, a short lifespan, and local cleanup.
 
