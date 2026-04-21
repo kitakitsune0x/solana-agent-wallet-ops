@@ -1,0 +1,3 @@
+interface:
+  display_name: "Solana Wallet Ops"
+  short_description: "Uses this repo as a guarded execution layer for Solana wallet sets, balances, bulk transfers, and SplitNOW flows."

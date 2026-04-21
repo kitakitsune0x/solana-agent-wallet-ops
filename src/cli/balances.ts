@@ -3,7 +3,8 @@
 import { Command } from "commander";
 import { PublicKey } from "@solana/web3.js";
 
-import { formatAssetAmount, formatError, formatSol, renderTable } from "../lib/format.js";
+import { addStorageOptions, runCli, toStorageOptions } from "../lib/cli.js";
+import { formatAssetAmount, formatSol, renderTable } from "../lib/format.js";
 import { createRpcConnection, getSolBalances, getSplAssociatedBalances, getSplMintMetadata, resolveRpcUrl } from "../lib/rpc.js";
 import { loadWalletSet, type StorageOptions } from "../lib/storage.js";
 import { ensureNetwork, maybeNetwork } from "../lib/validation.js";
@@ -18,22 +19,19 @@ interface Options extends StorageOptions {
 
 async function main(): Promise<void> {
   const program = new Command();
-  program
-    .name("balances")
-    .description("Check SOL or SPL balances for every wallet in a set.")
-    .requiredOption("--set <name>", "Wallet set name")
-    .option("--db-path <path>", "SQLite DB path (default: ~/.solana-agent-wallet-ops/wallets.sqlite)")
-    .option("--allow-repo-db", "Allow repo-local SQLite storage for secrets")
-    .option("--network <network>", "Override network: devnet or mainnet-beta")
-    .option("--rpc-url <url>", "Custom RPC URL")
-    .option("--mint <address>", "SPL token mint address");
+  addStorageOptions(
+    program
+      .name("balances")
+      .description("Check SOL or SPL balances for every wallet in a set.")
+      .requiredOption("--set <name>", "Wallet set name")
+      .option("--network <network>", "Override network: devnet or mainnet-beta")
+      .option("--rpc-url <url>", "Custom RPC URL")
+      .option("--mint <address>", "SPL token mint address"),
+  );
 
   program.parse(process.argv);
   const options = program.opts<Options>();
-  const storageOptions: StorageOptions = {
-    dbPath: options.dbPath,
-    allowRepoDb: options.allowRepoDb,
-  };
+  const storageOptions: StorageOptions = toStorageOptions(options);
   const walletSet = await loadWalletSet(options.set, storageOptions);
   const network = maybeNetwork(options.network) ?? ensureNetwork(walletSet.network);
   const connection = createRpcConnection(network, options.rpcUrl);
@@ -99,7 +97,4 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((error) => {
-  console.error(`Error: ${formatError(error)}`);
-  process.exit(1);
-});
+runCli(main);

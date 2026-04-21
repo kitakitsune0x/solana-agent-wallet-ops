@@ -1,0 +1,64 @@
+name: GitHub Release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - package.json
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read package versions
+        id: package
+        run: |
+          CURRENT_VERSION=$(node -e "console.log(JSON.parse(require('node:fs').readFileSync('package.json', 'utf8')).version)")
+          PREVIOUS_VERSION=$(git show "${{ github.event.before }}:package.json" 2>/dev/null | node -e "const fs = require('node:fs'); const input = fs.readFileSync(0, 'utf8').trim(); console.log(input ? JSON.parse(input).version : '');" || true)
+          echo "current=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
+          echo "previous=$PREVIOUS_VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch tags
+        run: git fetch --tags --force
+
+      - name: Check for version bump
+        id: version
+        run: |
+          if [ "${{ steps.package.outputs.current }}" = "${{ steps.package.outputs.previous }}" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check for existing tag
+        id: tag
+        if: steps.version.outputs.changed == 'true'
+        run: |
+          if git rev-parse "v${{ steps.package.outputs.current }}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create tag
+        if: steps.version.outputs.changed == 'true' && steps.tag.outputs.exists == 'false'
+        run: |
+          git tag "v${{ steps.package.outputs.current }}"
+          git push origin "v${{ steps.package.outputs.current }}"
+
+      - name: Publish GitHub release
+        if: steps.version.outputs.changed == 'true' && steps.tag.outputs.exists == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.package.outputs.current }}
+          generate_release_notes: true

@@ -14,6 +14,7 @@ This is not a consumer wallet app, not a GUI, and not tied to a single host such
 ## Features
 
 - Bulk create Solana wallets and save them as named wallet sets
+- Import wallet JSON into local wallet-set storage
 - List wallet sets or inspect wallets inside a set
 - Store wallet sets in local SQLite with indexed lookups
 - Check balances in bulk
@@ -47,6 +48,56 @@ Optional local build:
 pnpm build
 ```
 
+## Releases
+
+This repo now has GitHub-backed release automation with Changesets.
+
+Local release workflow:
+
+1. Run `pnpm changeset` for any user-visible change.
+2. Commit the generated file in `.changeset/` with the code change.
+3. Merge to `main`.
+4. GitHub Actions opens or updates a `chore: version packages` PR.
+5. After that PR is merged, GitHub Actions tags `v<version>` and creates a GitHub Release.
+
+Useful commands:
+
+```bash
+pnpm changeset
+pnpm release:status
+pnpm release:version
+```
+
+## Agent Skill
+
+This repo now exposes the repository root as the skill package for GitHub distribution:
+
+```text
+SKILL.md
+agents/openai.yml
+```
+
+That root-level skill is meant for Codex-style agents that need a safe, repeatable workflow for:
+
+- creating wallet sets
+- inspecting balances
+- exporting public addresses
+- previewing and executing SOL or SPL batch transfers
+- running SplitNOW quote, order, and status flows
+
+The skill points agents at the existing repo docs instead of copying them. It also bakes in the important operational rules:
+
+- keep wallet DBs and API keys outside the repo
+- use `devnet` by default unless the user explicitly wants `mainnet-beta`
+- preview before any live transfer
+- preserve the sender rent reserve for SOL transfers
+
+If an execution environment blocks `pnpm tsx` because of `tsx` IPC restrictions, agents can use the equivalent fallback form:
+
+```bash
+node --import tsx src/cli/<command>.ts ...
+```
+
 ## Command Examples
 
 Create a wallet set:
@@ -59,6 +110,18 @@ Create a wallet set with an explicit external DB path:
 
 ```bash
 pnpm tsx src/cli/create-wallets.ts --set test-set --count 25 --network devnet --db-path ~/.solana-agent-wallet-ops/wallets.sqlite
+```
+
+Import a wallet-set JSON file into SQLite storage:
+
+```bash
+pnpm tsx src/cli/import-wallets.ts --from ./wallet-set.json
+```
+
+Import a standalone wallet JSON file as a one-wallet set:
+
+```bash
+pnpm tsx src/cli/import-wallets.ts --from ./wallet.json --set imported-treasury --network devnet
 ```
 
 List all wallet sets:
@@ -128,6 +191,18 @@ Preview a SplitNOW order from an existing quote into a wallet set:
 pnpm tsx src/cli/splitnow-order.ts --quote-id QUOTE123 --to-set campaign
 ```
 
+Preview a SplitNOW order from a CSV recipient list:
+
+```bash
+pnpm tsx src/cli/splitnow-order.ts --quote-id QUOTE123 --to-csv ./splitnow-recipients.csv
+```
+
+Preview a SplitNOW order with a specific exchanger from the quote:
+
+```bash
+pnpm tsx src/cli/splitnow-order.ts --quote-id QUOTE123 --to-set campaign --exchanger changenow
+```
+
 Create the real SplitNOW order after review:
 
 ```bash
@@ -139,6 +214,27 @@ Track SplitNOW order status:
 ```bash
 pnpm tsx src/cli/splitnow-status.ts --order-id ABC123
 ```
+
+## SplitNOW Notes
+
+- `splitnow-quote` creates a floating-rate quote and prints the exchangers returned by SplitNOW, sorted by estimated output.
+- `splitnow-order` consumes an existing quote and builds a multi-wallet order from either `--to-set` or `--to-csv`.
+- The current implementation splits funds evenly across recipients. It does not support per-recipient custom percentages yet.
+- The current implementation uses one exchanger per order. By default it selects `best`, or you can pass `--exchanger <id>` to force one of the exchanger ids returned by the quote.
+- SplitNOW recipient sources are address-only:
+  - wallet set via `--to-set`
+  - CSV via `--to-csv`
+- SplitNOW recipient CSV columns:
+  - required: `public_key`
+  - optional: `label`
+- SplitNOW orders reject empty recipient lists, duplicate recipient public keys, and recipient counts above 100.
+- Before creating an order, the client checks SplitNOW deposit limits and rejects orders that are below the minimum required deposit for the selected asset and recipient count.
+- Creating an order does not move funds by itself. It returns:
+  - `orderId`
+  - `depositAddress`
+  - `depositAmount`
+- After order creation, you still need to send the deposit to the returned address, then track progress with `splitnow-status`.
+- Use `--api-url` only when intentionally pointing at a non-default SplitNOW API endpoint.
 
 Notes for CSV recipient input:
 
@@ -156,6 +252,12 @@ Storage path overrides:
 - env override: `SAWO_DB_PATH=/path/to/wallets.sqlite`
 - repo-local DBs are rejected unless you pass `--allow-repo-db` or set `SAWO_ALLOW_REPO_DB=1`
 - SplitNOW API key: `SPLITNOW_API_KEY=...`
+
+Wallet import formats:
+
+- wallet-set JSON file with `set_name`, `created_at`, `network`, and `wallets`
+- standalone wallet JSON object with `label`, `public_key`, and `secret_key_base58`
+- JSON array of wallet entries when you also pass `--set` and `--network`
 
 ## Storage Format
 

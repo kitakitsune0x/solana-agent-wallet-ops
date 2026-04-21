@@ -2,7 +2,15 @@
 
 import { Command } from "commander";
 
-import { formatError, formatTimestamp, renderTable } from "../lib/format.js";
+import {
+  addStorageOptions,
+  printSecretsReminder,
+  renderWalletTable,
+  runCli,
+  SHOW_SECRETS_OPTION_DESCRIPTION,
+  toStorageOptions,
+} from "../lib/cli.js";
+import { formatTimestamp, renderTable } from "../lib/format.js";
 import { listWalletSetSummaries, loadWalletSet, type StorageOptions } from "../lib/storage.js";
 
 interface Options extends StorageOptions {
@@ -12,20 +20,17 @@ interface Options extends StorageOptions {
 
 async function main(): Promise<void> {
   const program = new Command();
-  program
-    .name("list-wallets")
-    .description("List wallet sets or wallets inside a set.")
-    .option("--set <name>", "Wallet set name")
-    .option("--db-path <path>", "SQLite DB path (default: ~/.solana-agent-wallet-ops/wallets.sqlite)")
-    .option("--allow-repo-db", "Allow repo-local SQLite storage for secrets")
-    .option("--show-secrets", "Display secret keys");
+  addStorageOptions(
+    program
+      .name("list-wallets")
+      .description("List wallet sets or wallets inside a set.")
+      .option("--set <name>", "Wallet set name")
+      .option("--show-secrets", SHOW_SECRETS_OPTION_DESCRIPTION),
+  );
 
   program.parse(process.argv);
   const options = program.opts<Options>();
-  const storageOptions: StorageOptions = {
-    dbPath: options.dbPath,
-    allowRepoDb: options.allowRepoDb,
-  };
+  const storageOptions: StorageOptions = toStorageOptions(options);
 
   if (!options.set) {
     const walletSets = await listWalletSetSummaries(storageOptions);
@@ -52,24 +57,8 @@ async function main(): Promise<void> {
   console.log(`Wallets: ${walletSet.wallets.length}`);
   console.log(`Created At: ${formatTimestamp(walletSet.created_at)}`);
   console.log("");
-
-  const headers = options.showSecrets
-    ? ["Label", "Public Key", "Secret Key (base58)"]
-    : ["Label", "Public Key"];
-  const rows = walletSet.wallets.map((wallet) =>
-    options.showSecrets
-      ? [wallet.label, wallet.public_key, wallet.secret_key_base58]
-      : [wallet.label, wallet.public_key],
-  );
-  console.log(renderTable(headers, rows));
-
-  if (!options.showSecrets) {
-    console.log("");
-    console.log("Secrets were not printed. Pass --show-secrets to display them explicitly.");
-  }
+  console.log(renderWalletTable(walletSet.wallets, options.showSecrets));
+  printSecretsReminder(options.showSecrets);
 }
 
-main().catch((error) => {
-  console.error(`Error: ${formatError(error)}`);
-  process.exit(1);
-});
+runCli(main);

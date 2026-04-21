@@ -30,10 +30,12 @@ export interface SolTransferPlan {
   sender: WalletEntry;
   recipients: TransferRecipient[];
   sender_balance_lamports: number;
+  sender_rent_exempt_minimum_lamports: number;
   per_transfer_fee_lamports: number;
   total_transfer_lamports: number;
   total_fee_lamports: number;
   total_required_lamports: number;
+  total_required_with_reserve_lamports: number;
   remaining_lamports: number;
   sufficient_balance: boolean;
 }
@@ -120,10 +122,15 @@ export async function buildSolTransferPlan(
   const senderPublicKey = new PublicKey(sender.public_key);
   const sampleRecipient = new PublicKey(recipients[0].public_key);
   const senderBalanceLamports = await connection.getBalance(senderPublicKey, DEFAULT_COMMITMENT);
+  const senderRentExemptMinimumLamports = await connection.getMinimumBalanceForRentExemption(
+    0,
+    DEFAULT_COMMITMENT,
+  );
   const perTransferFeeLamports = await estimateSolTransferFeeLamports(connection, senderPublicKey, sampleRecipient);
   const totalTransferLamports = recipients.reduce((sum, recipient) => sum + recipient.amount_base_units, 0);
   const totalFeeLamports = perTransferFeeLamports * recipients.length;
   const totalRequiredLamports = totalTransferLamports + totalFeeLamports;
+  const totalRequiredWithReserveLamports = totalRequiredLamports + senderRentExemptMinimumLamports;
   const remainingLamports = senderBalanceLamports - totalRequiredLamports;
 
   return {
@@ -132,12 +139,14 @@ export async function buildSolTransferPlan(
     sender,
     recipients,
     sender_balance_lamports: senderBalanceLamports,
+    sender_rent_exempt_minimum_lamports: senderRentExemptMinimumLamports,
     per_transfer_fee_lamports: perTransferFeeLamports,
     total_transfer_lamports: totalTransferLamports,
     total_fee_lamports: totalFeeLamports,
     total_required_lamports: totalRequiredLamports,
+    total_required_with_reserve_lamports: totalRequiredWithReserveLamports,
     remaining_lamports: remainingLamports,
-    sufficient_balance: senderBalanceLamports >= totalRequiredLamports,
+    sufficient_balance: senderBalanceLamports >= totalRequiredWithReserveLamports,
   };
 }
 

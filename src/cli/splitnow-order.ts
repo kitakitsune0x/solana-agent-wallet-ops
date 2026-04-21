@@ -2,7 +2,8 @@
 
 import { Command } from "commander";
 
-import { formatError, relativeFromCwd, renderTable } from "../lib/format.js";
+import { addStorageOptions, runCli, toStorageOptions } from "../lib/cli.js";
+import { relativeFromCwd, renderTable } from "../lib/format.js";
 import { loadWalletSet, type StorageOptions } from "../lib/storage.js";
 import {
   buildEvenSplitNowWalletDistributions,
@@ -28,10 +29,7 @@ async function loadRecipients(options: Options): Promise<{
   recipients: SplitNowRecipient[];
   description: string;
 }> {
-  const storageOptions: StorageOptions = {
-    dbPath: options.dbPath,
-    allowRepoDb: options.allowRepoDb,
-  };
+  const storageOptions: StorageOptions = toStorageOptions(options);
 
   if (Boolean(options.toSet) === Boolean(options.toCsv)) {
     throw new Error("Provide exactly one SplitNOW recipient source: --to-set or --to-csv.");
@@ -98,18 +96,18 @@ function renderDistributionTable(distributions: SplitNowWalletDistribution[], re
 async function main(): Promise<void> {
   const program = new Command();
 
-  program
-    .name("splitnow-order")
-    .description("Preview or create a SplitNOW multi-wallet order from a quote.")
-    .requiredOption("--quote-id <id>", "SplitNOW quote id")
-    .option("--to-set <name>", "Destination Solana wallet set")
-    .option("--to-csv <path>", "Destination CSV with public_key and optional label columns")
-    .option("--db-path <path>", "SQLite DB path (default: ~/.solana-agent-wallet-ops/wallets.sqlite)")
-    .option("--allow-repo-db", "Allow repo-local SQLite storage for secrets")
-    .option("--exchanger <id>", "Use a specific exchanger id, or 'best'", "best")
-    .option("--execute", "Create the real SplitNOW order")
-    .option("--api-key <key>", "SplitNOW API key (prefer SPLITNOW_API_KEY)")
-    .option("--api-url <url>", "Override SplitNOW API URL");
+  addStorageOptions(
+    program
+      .name("splitnow-order")
+      .description("Preview or create a SplitNOW multi-wallet order from a quote.")
+      .requiredOption("--quote-id <id>", "SplitNOW quote id")
+      .option("--to-set <name>", "Destination Solana wallet set")
+      .option("--to-csv <path>", "Destination CSV with public_key and optional label columns")
+      .option("--exchanger <id>", "Use a specific exchanger id, or 'best'", "best")
+      .option("--execute", "Create the real SplitNOW order")
+      .option("--api-key <key>", "SplitNOW API key (prefer SPLITNOW_API_KEY)")
+      .option("--api-url <url>", "Override SplitNOW API URL"),
+  );
 
   program.parse(process.argv);
   const options = program.opts<Options>();
@@ -157,7 +155,4 @@ async function main(): Promise<void> {
   console.log(`Deposit Amount: ${order.depositAmount}`);
 }
 
-main().catch((error) => {
-  console.error(`Error: ${formatError(error)}`);
-  process.exit(1);
-});
+runCli(main);

@@ -87,7 +87,27 @@ Wallet entry fields:
 
 ## Portable JSON Input
 
-Primary storage is SQLite, but `bulk-transfer.ts --from <file>` accepts portable JSON input for one-off sources.
+Primary storage is SQLite, but JSON files are also useful for import and one-off transfer sources.
+
+`import-wallets.ts --from <file>` accepts:
+
+- a wallet-set JSON file
+- a standalone wallet JSON object
+- a JSON array of wallet entries when `--set` and `--network` are provided
+
+Examples:
+
+Import a wallet-set JSON file directly:
+
+```bash
+pnpm tsx src/cli/import-wallets.ts --from ./wallet-set.json
+```
+
+Import a standalone wallet JSON object into a named set:
+
+```bash
+pnpm tsx src/cli/import-wallets.ts --from ./wallet.json --set imported-wallet --network devnet
+```
 
 `bulk-transfer.ts --from <file>` also accepts a standalone wallet JSON object:
 

@@ -35,6 +35,16 @@ export function walletEntryFromKeypair(keypair: Keypair, label: string): WalletE
   };
 }
 
+export function normalizeWalletLabel(value: string, fieldName = "label"): string {
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    throw new Error(`Invalid ${fieldName}: value cannot be empty.`);
+  }
+
+  return trimmed;
+}
+
 export function keypairFromSecret(secretKeyBase58: string): Keypair {
   const decoded = bs58.decode(secretKeyBase58.trim());
   return Keypair.fromSecretKey(decoded);
@@ -46,4 +56,32 @@ export function normalizePublicKey(value: string, fieldName = "public_key"): str
   } catch {
     throw new Error(`Invalid ${fieldName}: ${value}`);
   }
+}
+
+export function normalizeWalletEntry(wallet: WalletEntry, fieldName = "wallet"): WalletEntry {
+  const label = normalizeWalletLabel(wallet.label, `${fieldName}.label`);
+  const publicKey = normalizePublicKey(wallet.public_key, `${fieldName}.public_key`);
+  const secretKeyBase58 = wallet.secret_key_base58.trim();
+
+  if (!secretKeyBase58) {
+    throw new Error(`Invalid ${fieldName}.secret_key_base58: value cannot be empty.`);
+  }
+
+  let keypair: Keypair;
+
+  try {
+    keypair = keypairFromSecret(secretKeyBase58);
+  } catch {
+    throw new Error(`Invalid ${fieldName}.secret_key_base58.`);
+  }
+
+  if (keypair.publicKey.toBase58() !== publicKey) {
+    throw new Error(`${fieldName} public_key does not match secret_key_base58.`);
+  }
+
+  return {
+    label,
+    public_key: publicKey,
+    secret_key_base58: secretKeyBase58,
+  };
 }

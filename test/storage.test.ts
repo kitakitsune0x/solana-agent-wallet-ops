@@ -7,6 +7,7 @@ import test from "node:test";
 import {
   getConfiguredDbPath,
   loadSourceWalletFromFile,
+  loadWalletSetFromFile,
   loadWalletSet,
   listWalletSetSummaries,
   saveWalletSet,
@@ -142,6 +143,138 @@ test("loadSourceWalletFromFile rejects multi-wallet wallet-set JSON files", asyn
     await assert.rejects(
       () => loadSourceWalletFromFile(filePath),
       /contains 2 wallets/,
+    );
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test("loadWalletSetFromFile accepts a wallet-set JSON file", async () => {
+  const tempRoot = await mkdtemp(path.join(tmpdir(), "sawo-import-"));
+
+  try {
+    const walletSet = createSampleWalletSet("imported-set", 2);
+    const filePath = path.join(tempRoot, "wallet-set.json");
+    await writeFile(filePath, `${JSON.stringify(walletSet, null, 2)}\n`, "utf8");
+
+    const loaded = await loadWalletSetFromFile(filePath);
+
+    assert.equal(loaded.set_name, "imported-set");
+    assert.equal(loaded.network, "devnet");
+    assert.equal(loaded.wallets.length, 2);
+    assert.deepEqual(
+      loaded.wallets.map((wallet) => wallet.public_key),
+      walletSet.wallets.map((wallet) => wallet.public_key),
+    );
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test("loadWalletSetFromFile accepts overrides for wallet-set JSON", async () => {
+  const tempRoot = await mkdtemp(path.join(tmpdir(), "sawo-import-"));
+
+  try {
+    const walletSet = createSampleWalletSet("imported-set", 1);
+    const filePath = path.join(tempRoot, "wallet-set.json");
+    await writeFile(filePath, `${JSON.stringify(walletSet, null, 2)}\n`, "utf8");
+
+    const loaded = await loadWalletSetFromFile(filePath, {
+      setName: "renamed-set",
+      network: "mainnet-beta",
+    });
+
+    assert.equal(loaded.set_name, "renamed-set");
+    assert.equal(loaded.network, "mainnet-beta");
+    assert.equal(loaded.wallets.length, 1);
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test("loadWalletSetFromFile accepts a standalone wallet entry with set and network", async () => {
+  const tempRoot = await mkdtemp(path.join(tmpdir(), "sawo-import-"));
+
+  try {
+    const wallet = createWalletEntry("single-wallet");
+    const filePath = path.join(tempRoot, "wallet.json");
+    await writeFile(filePath, `${JSON.stringify(wallet, null, 2)}\n`, "utf8");
+
+    const loaded = await loadWalletSetFromFile(filePath, {
+      setName: "single-import",
+      network: "devnet",
+    });
+
+    assert.equal(loaded.set_name, "single-import");
+    assert.equal(loaded.network, "devnet");
+    assert.equal(loaded.wallets.length, 1);
+    assert.deepEqual(loaded.wallets[0], wallet);
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test("loadWalletSetFromFile accepts a JSON array of wallet entries", async () => {
+  const tempRoot = await mkdtemp(path.join(tmpdir(), "sawo-import-"));
+
+  try {
+    const wallets = [createWalletEntry("alpha"), createWalletEntry("beta")];
+    const filePath = path.join(tempRoot, "wallets.json");
+    await writeFile(filePath, `${JSON.stringify(wallets, null, 2)}\n`, "utf8");
+
+    const loaded = await loadWalletSetFromFile(filePath, {
+      setName: "array-import",
+      network: "mainnet-beta",
+    });
+
+    assert.equal(loaded.set_name, "array-import");
+    assert.equal(loaded.network, "mainnet-beta");
+    assert.equal(loaded.wallets.length, 2);
+    assert.deepEqual(
+      loaded.wallets.map((wallet) => wallet.label),
+      ["alpha", "beta"],
+    );
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test("loadWalletSetFromFile rejects standalone wallet import without set and network", async () => {
+  const tempRoot = await mkdtemp(path.join(tmpdir(), "sawo-import-"));
+
+  try {
+    const wallet = createWalletEntry("single-wallet");
+    const filePath = path.join(tempRoot, "wallet.json");
+    await writeFile(filePath, `${JSON.stringify(wallet, null, 2)}\n`, "utf8");
+
+    await assert.rejects(
+      () => loadWalletSetFromFile(filePath),
+      /requires both --set and --network/,
+    );
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test("loadWalletSetFromFile rejects wallet entries whose public key does not match the secret", async () => {
+  const tempRoot = await mkdtemp(path.join(tmpdir(), "sawo-import-"));
+
+  try {
+    const wallet = createWalletEntry("broken-wallet");
+    const filePath = path.join(tempRoot, "wallet.json");
+    await writeFile(
+      filePath,
+      `${JSON.stringify({ ...wallet, public_key: createWalletEntry("other").public_key }, null, 2)}\n`,
+      "utf8",
+    );
+
+    await assert.rejects(
+      () =>
+        loadWalletSetFromFile(filePath, {
+          setName: "broken-import",
+          network: "devnet",
+        }),
+      /does not match secret_key_base58/,
     );
   } finally {
     await rm(tempRoot, { recursive: true, force: true });

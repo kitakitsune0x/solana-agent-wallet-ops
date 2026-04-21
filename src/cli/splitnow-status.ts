@@ -2,7 +2,7 @@
 
 import { Command } from "commander";
 
-import { formatError } from "../lib/format.js";
+import { runCli } from "../lib/cli.js";
 import { resolveSplitNowApiKey, SplitNowClient } from "../lib/splitnow.js";
 
 interface Options {
@@ -35,7 +35,4 @@ async function main(): Promise<void> {
   console.log(`Status Text: ${status.orderStatusText}`);
 }
 
-main().catch((error) => {
-  console.error(`Error: ${formatError(error)}`);
-  process.exit(1);
-});
+runCli(main);

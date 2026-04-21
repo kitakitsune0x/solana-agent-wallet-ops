@@ -2,6 +2,7 @@
 
 import { Command } from "commander";
 
+import { runCli } from "../lib/cli.js";
 import { formatError, renderTable } from "../lib/format.js";
 import {
   chooseBestSplitNowRate,
@@ -88,7 +89,4 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((error) => {
-  console.error(`Error: ${formatError(error)}`);
-  process.exit(1);
-});
+runCli(main);

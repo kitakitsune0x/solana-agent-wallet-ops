@@ -3,14 +3,19 @@
   "version": "0.1.0",
   "description": "General-purpose Solana wallet operations toolkit for agentic workflows.",
   "type": "module",
+  "packageManager": "pnpm@8.15.1",
   "engines": {
     "node": ">=20"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "changeset": "changeset",
+    "release:status": "changeset status --verbose",
+    "release:version": "changeset version",
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test test/**/*.test.ts",
     "create-wallets": "tsx src/cli/create-wallets.ts",
+    "import-wallets": "tsx src/cli/import-wallets.ts",
     "list-wallets": "tsx src/cli/list-wallets.ts",
     "balances": "tsx src/cli/balances.ts",
     "export-addresses": "tsx src/cli/export-addresses.ts",
@@ -27,6 +32,7 @@
     "commander": "^14.0.1"
   },
   "devDependencies": {
+    "@changesets/cli": "^2.29.6",
     "@types/node": "^24.6.0",
     "tsx": "^4.20.5",
     "typescript": "^5.9.3"

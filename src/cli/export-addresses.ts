@@ -4,7 +4,8 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { Command } from "commander";
 
-import { escapeCsvValue, formatError, relativeFromCwd } from "../lib/format.js";
+import { addStorageOptions, runCli, toStorageOptions } from "../lib/cli.js";
+import { escapeCsvValue, relativeFromCwd } from "../lib/format.js";
 import { loadWalletSet, type StorageOptions } from "../lib/storage.js";
 
 interface Options extends StorageOptions {
@@ -14,20 +15,17 @@ interface Options extends StorageOptions {
 
 async function main(): Promise<void> {
   const program = new Command();
-  program
-    .name("export-addresses")
-    .description("Export wallet labels and public keys to CSV.")
-    .requiredOption("--set <name>", "Wallet set name")
-    .option("--db-path <path>", "SQLite DB path (default: ~/.solana-agent-wallet-ops/wallets.sqlite)")
-    .option("--allow-repo-db", "Allow repo-local SQLite storage for secrets")
-    .requiredOption("--out <path>", "Output CSV path");
+  addStorageOptions(
+    program
+      .name("export-addresses")
+      .description("Export wallet labels and public keys to CSV.")
+      .requiredOption("--set <name>", "Wallet set name")
+      .requiredOption("--out <path>", "Output CSV path"),
+  );
 
   program.parse(process.argv);
   const options = program.opts<Options>();
-  const storageOptions: StorageOptions = {
-    dbPath: options.dbPath,
-    allowRepoDb: options.allowRepoDb,
-  };
+  const storageOptions: StorageOptions = toStorageOptions(options);
   const walletSet = await loadWalletSet(options.set, storageOptions);
   const outputPath = path.resolve(process.cwd(), options.out);
   const lines = [
@@ -43,7 +41,4 @@ async function main(): Promise<void> {
   console.log(`Out: ${relativeFromCwd(outputPath)}`);
 }
 
-main().catch((error) => {
-  console.error(`Error: ${formatError(error)}`);
-  process.exit(1);
-});
+runCli(main);

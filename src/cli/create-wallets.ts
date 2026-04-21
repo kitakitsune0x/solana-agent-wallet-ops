@@ -2,7 +2,15 @@
 
 import { Command } from "commander";
 
-import { formatError, relativeFromCwd, renderTable } from "../lib/format.js";
+import {
+  addStorageOptions,
+  printSecretsReminder,
+  renderWalletTable,
+  runCli,
+  SHOW_SECRETS_OPTION_DESCRIPTION,
+  toStorageOptions,
+} from "../lib/cli.js";
+import { relativeFromCwd } from "../lib/format.js";
 import { saveWalletSet, type StorageOptions } from "../lib/storage.js";
 import { ensureNetwork, normalizeSetName, parsePositiveInteger } from "../lib/validation.js";
 import { createWalletEntry } from "../lib/wallet.js";
@@ -16,22 +24,19 @@ interface Options extends StorageOptions {
 
 async function main(): Promise<void> {
   const program = new Command();
-  program
-    .name("create-wallets")
-    .description("Create a wallet set with multiple Solana wallets.")
-    .requiredOption("--set <name>", "Wallet set name")
-    .requiredOption("--count <count>", "Number of wallets to create")
-    .requiredOption("--network <network>", "Target network: devnet or mainnet-beta")
-    .option("--db-path <path>", "SQLite DB path (default: ~/.solana-agent-wallet-ops/wallets.sqlite)")
-    .option("--allow-repo-db", "Allow repo-local SQLite storage for secrets")
-    .option("--show-secrets", "Print secret keys after creation");
+  addStorageOptions(
+    program
+      .name("create-wallets")
+      .description("Create a wallet set with multiple Solana wallets.")
+      .requiredOption("--set <name>", "Wallet set name")
+      .requiredOption("--count <count>", "Number of wallets to create")
+      .requiredOption("--network <network>", "Target network: devnet or mainnet-beta")
+      .option("--show-secrets", `${SHOW_SECRETS_OPTION_DESCRIPTION} after creation`),
+  );
 
   program.parse(process.argv);
   const options = program.opts<Options>();
-  const storageOptions: StorageOptions = {
-    dbPath: options.dbPath,
-    allowRepoDb: options.allowRepoDb,
-  };
+  const storageOptions: StorageOptions = toStorageOptions(options);
   const setName = normalizeSetName(options.set);
   const count = parsePositiveInteger(options.count, "count");
   const network = ensureNetwork(options.network);
@@ -50,24 +55,8 @@ async function main(): Promise<void> {
   console.log(`Wallets: ${wallets.length}`);
   console.log(`DB: ${relativeFromCwd(dbPath)}`);
   console.log("");
-
-  const headers = options.showSecrets
-    ? ["Label", "Public Key", "Secret Key (base58)"]
-    : ["Label", "Public Key"];
-  const rows = wallets.map((wallet) =>
-    options.showSecrets
-      ? [wallet.label, wallet.public_key, wallet.secret_key_base58]
-      : [wallet.label, wallet.public_key],
-  );
-  console.log(renderTable(headers, rows));
-
-  if (!options.showSecrets) {
-    console.log("");
-    console.log("Secrets were not printed. Pass --show-secrets to display them explicitly.");
-  }
+  console.log(renderWalletTable(wallets, options.showSecrets));
+  printSecretsReminder(options.showSecrets);
 }
 
-main().catch((error) => {
-  console.error(`Error: ${formatError(error)}`);
-  process.exit(1);
-});
+runCli(main);
