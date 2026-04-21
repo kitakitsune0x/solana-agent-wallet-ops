@@ -20,7 +20,7 @@ import {
   renderTable,
 } from "../lib/format.js";
 import { createRpcConnection, getSplMintMetadata, resolveRpcUrl } from "../lib/rpc.js";
-import { loadSourceWalletFromFile, loadWalletSet, type WalletSet } from "../lib/storage.js";
+import { loadSourceWalletFromFile, loadWalletSet, type StorageOptions, type WalletSet } from "../lib/storage.js";
 import {
   normalizeSetName,
   parseAmountToBaseUnits,
@@ -40,6 +40,8 @@ interface Options {
   dryRun?: boolean;
   execute?: boolean;
   mint?: string;
+  dbPath?: string;
+  allowRepoDb?: boolean;
 }
 
 interface SenderContext {
@@ -119,8 +121,13 @@ function parseCsv(content: string): string[][] {
 }
 
 async function loadSender(options: Options): Promise<SenderContext> {
+  const storageOptions: StorageOptions = {
+    dbPath: options.dbPath,
+    allowRepoDb: options.allowRepoDb,
+  };
+
   if (options.fromSet) {
-    const walletSet = await loadWalletSet(normalizeSetName(options.fromSet));
+    const walletSet = await loadWalletSet(normalizeSetName(options.fromSet), storageOptions);
 
     if (walletSet.wallets.length === 0) {
       throw new Error(`Wallet set "${walletSet.set_name}" does not contain any wallets.`);
@@ -245,6 +252,8 @@ async function main(): Promise<void> {
     .option("--to-set <name>", "Destination wallet set")
     .option("--from <path>", "Path to a wallet JSON or single-wallet wallet-set JSON")
     .option("--to-csv <path>", "CSV file with recipients")
+    .option("--db-path <path>", "SQLite DB path (default: ~/.solana-agent-wallet-ops/wallets.sqlite)")
+    .option("--allow-repo-db", "Allow repo-local SQLite storage for secrets")
     .option("--amount <amount>", "Global transfer amount")
     .option("--network <network>", "Override network: devnet or mainnet-beta")
     .option("--rpc-url <url>", "Custom RPC URL")
@@ -270,9 +279,13 @@ async function main(): Promise<void> {
     throw new Error("Provide exactly one destination: --to-set or --to-csv.");
   }
 
+  const storageOptions: StorageOptions = {
+    dbPath: options.dbPath,
+    allowRepoDb: options.allowRepoDb,
+  };
   const senderContext = await loadSender(options);
   const destinationWalletSet: WalletSet | undefined = options.toSet
-    ? await loadWalletSet(normalizeSetName(options.toSet))
+    ? await loadWalletSet(normalizeSetName(options.toSet), storageOptions)
     : undefined;
   const network = resolveTransferNetwork(options.network, [
     senderContext.storedNetwork,

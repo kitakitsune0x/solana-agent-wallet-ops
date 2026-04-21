@@ -3,11 +3,11 @@
 import { Command } from "commander";
 
 import { formatError, relativeFromCwd, renderTable } from "../lib/format.js";
-import { getWalletSetPath, saveWalletSet } from "../lib/storage.js";
+import { saveWalletSet, type StorageOptions } from "../lib/storage.js";
 import { ensureNetwork, normalizeSetName, parsePositiveInteger } from "../lib/validation.js";
 import { createWalletEntry } from "../lib/wallet.js";
 
-interface Options {
+interface Options extends StorageOptions {
   set: string;
   count: string;
   network: string;
@@ -22,29 +22,33 @@ async function main(): Promise<void> {
     .requiredOption("--set <name>", "Wallet set name")
     .requiredOption("--count <count>", "Number of wallets to create")
     .requiredOption("--network <network>", "Target network: devnet or mainnet-beta")
+    .option("--db-path <path>", "SQLite DB path (default: ~/.solana-agent-wallet-ops/wallets.sqlite)")
+    .option("--allow-repo-db", "Allow repo-local SQLite storage for secrets")
     .option("--show-secrets", "Print secret keys after creation");
 
   program.parse(process.argv);
   const options = program.opts<Options>();
+  const storageOptions: StorageOptions = {
+    dbPath: options.dbPath,
+    allowRepoDb: options.allowRepoDb,
+  };
   const setName = normalizeSetName(options.set);
   const count = parsePositiveInteger(options.count, "count");
   const network = ensureNetwork(options.network);
   const wallets = Array.from({ length: count }, (_, index) =>
     createWalletEntry(`${setName}-${String(index + 1).padStart(3, "0")}`),
   );
-  const filePath = getWalletSetPath(setName);
-
-  await saveWalletSet({
+  const dbPath = await saveWalletSet({
     set_name: setName,
     created_at: new Date().toISOString(),
     network,
     wallets,
-  });
+  }, storageOptions);
 
   console.log(`Created wallet set "${setName}"`);
   console.log(`Network: ${network}`);
   console.log(`Wallets: ${wallets.length}`);
-  console.log(`File: ${relativeFromCwd(filePath)}`);
+  console.log(`DB: ${relativeFromCwd(dbPath)}`);
   console.log("");
 
   const headers = options.showSecrets

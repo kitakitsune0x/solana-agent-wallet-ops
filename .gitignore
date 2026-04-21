@@ -3,5 +3,8 @@ dist
 .DS_Store
 *.log
 exports
-data/wallet-sets/*.json
-!data/wallet-sets/.gitkeep
+data/wallet-sets/
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*

@@ -5,11 +5,11 @@ import { PublicKey } from "@solana/web3.js";
 
 import { formatAssetAmount, formatError, formatSol, renderTable } from "../lib/format.js";
 import { createRpcConnection, getSolBalances, getSplAssociatedBalances, getSplMintMetadata, resolveRpcUrl } from "../lib/rpc.js";
-import { loadWalletSet } from "../lib/storage.js";
+import { loadWalletSet, type StorageOptions } from "../lib/storage.js";
 import { ensureNetwork, maybeNetwork } from "../lib/validation.js";
 import { normalizePublicKey } from "../lib/wallet.js";
 
-interface Options {
+interface Options extends StorageOptions {
   set: string;
   network?: string;
   rpcUrl?: string;
@@ -22,13 +22,19 @@ async function main(): Promise<void> {
     .name("balances")
     .description("Check SOL or SPL balances for every wallet in a set.")
     .requiredOption("--set <name>", "Wallet set name")
+    .option("--db-path <path>", "SQLite DB path (default: ~/.solana-agent-wallet-ops/wallets.sqlite)")
+    .option("--allow-repo-db", "Allow repo-local SQLite storage for secrets")
     .option("--network <network>", "Override network: devnet or mainnet-beta")
     .option("--rpc-url <url>", "Custom RPC URL")
     .option("--mint <address>", "SPL token mint address");
 
   program.parse(process.argv);
   const options = program.opts<Options>();
-  const walletSet = await loadWalletSet(options.set);
+  const storageOptions: StorageOptions = {
+    dbPath: options.dbPath,
+    allowRepoDb: options.allowRepoDb,
+  };
+  const walletSet = await loadWalletSet(options.set, storageOptions);
   const network = maybeNetwork(options.network) ?? ensureNetwork(walletSet.network);
   const connection = createRpcConnection(network, options.rpcUrl);
   const rpcTarget = resolveRpcUrl(network, options.rpcUrl);

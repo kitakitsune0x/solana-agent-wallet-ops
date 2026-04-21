@@ -5,9 +5,9 @@ import path from "node:path";
 import { Command } from "commander";
 
 import { escapeCsvValue, formatError, relativeFromCwd } from "../lib/format.js";
-import { loadWalletSet } from "../lib/storage.js";
+import { loadWalletSet, type StorageOptions } from "../lib/storage.js";
 
-interface Options {
+interface Options extends StorageOptions {
   set: string;
   out: string;
 }
@@ -18,11 +18,17 @@ async function main(): Promise<void> {
     .name("export-addresses")
     .description("Export wallet labels and public keys to CSV.")
     .requiredOption("--set <name>", "Wallet set name")
+    .option("--db-path <path>", "SQLite DB path (default: ~/.solana-agent-wallet-ops/wallets.sqlite)")
+    .option("--allow-repo-db", "Allow repo-local SQLite storage for secrets")
     .requiredOption("--out <path>", "Output CSV path");
 
   program.parse(process.argv);
   const options = program.opts<Options>();
-  const walletSet = await loadWalletSet(options.set);
+  const storageOptions: StorageOptions = {
+    dbPath: options.dbPath,
+    allowRepoDb: options.allowRepoDb,
+  };
+  const walletSet = await loadWalletSet(options.set, storageOptions);
   const outputPath = path.resolve(process.cwd(), options.out);
   const lines = [
     "label,public_key",

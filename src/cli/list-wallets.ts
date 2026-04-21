@@ -3,9 +3,9 @@
 import { Command } from "commander";
 
 import { formatError, formatTimestamp, renderTable } from "../lib/format.js";
-import { listWalletSets, loadWalletSet } from "../lib/storage.js";
+import { listWalletSetSummaries, loadWalletSet, type StorageOptions } from "../lib/storage.js";
 
-interface Options {
+interface Options extends StorageOptions {
   set?: string;
   showSecrets?: boolean;
 }
@@ -16,13 +16,19 @@ async function main(): Promise<void> {
     .name("list-wallets")
     .description("List wallet sets or wallets inside a set.")
     .option("--set <name>", "Wallet set name")
+    .option("--db-path <path>", "SQLite DB path (default: ~/.solana-agent-wallet-ops/wallets.sqlite)")
+    .option("--allow-repo-db", "Allow repo-local SQLite storage for secrets")
     .option("--show-secrets", "Display secret keys");
 
   program.parse(process.argv);
   const options = program.opts<Options>();
+  const storageOptions: StorageOptions = {
+    dbPath: options.dbPath,
+    allowRepoDb: options.allowRepoDb,
+  };
 
   if (!options.set) {
-    const walletSets = await listWalletSets();
+    const walletSets = await listWalletSetSummaries(storageOptions);
 
     if (walletSets.length === 0) {
       console.log("No wallet sets found.");
@@ -32,7 +38,7 @@ async function main(): Promise<void> {
     const rows = walletSets.map((walletSet) => [
       walletSet.set_name,
       walletSet.network,
-      String(walletSet.wallets.length),
+      String(walletSet.wallet_count),
       formatTimestamp(walletSet.created_at),
     ]);
 
@@ -40,7 +46,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  const walletSet = await loadWalletSet(options.set);
+  const walletSet = await loadWalletSet(options.set, storageOptions);
   console.log(`Set: ${walletSet.set_name}`);
   console.log(`Network: ${walletSet.network}`);
   console.log(`Wallets: ${walletSet.wallets.length}`);

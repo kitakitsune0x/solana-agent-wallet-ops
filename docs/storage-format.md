@@ -1,10 +1,56 @@
 # Storage Format
 
-## Wallet Set JSON
+## Primary Storage
 
-Wallet sets are stored under `data/wallet-sets/` as one JSON file per set.
+Wallet sets are stored in a local SQLite database by default:
 
-Example:
+```text
+~/.solana-agent-wallet-ops/wallets.sqlite
+```
+
+You can override that location with:
+
+- `--db-path <path>`
+- `SAWO_DB_PATH=/path/to/wallets.sqlite`
+
+Repo-local secret storage is rejected unless you explicitly opt in with `--allow-repo-db` or `SAWO_ALLOW_REPO_DB=1`.
+
+## SQLite Schema
+
+Logical schema:
+
+```sql
+CREATE TABLE wallet_sets (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  set_name TEXT NOT NULL UNIQUE,
+  created_at TEXT NOT NULL,
+  network TEXT NOT NULL CHECK (network IN ('devnet', 'mainnet-beta'))
+);
+
+CREATE TABLE wallets (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  set_id INTEGER NOT NULL REFERENCES wallet_sets(id) ON DELETE CASCADE,
+  wallet_index INTEGER NOT NULL,
+  label TEXT NOT NULL,
+  public_key TEXT NOT NULL,
+  secret_key_base58 TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  UNIQUE (set_id, wallet_index),
+  UNIQUE (set_id, label),
+  UNIQUE (set_id, public_key)
+);
+```
+
+Indexes:
+
+- `idx_wallet_sets_name` on `wallet_sets(set_name)`
+- `idx_wallets_set_id` on `wallets(set_id)`
+- `idx_wallets_public_key` on `wallets(public_key)`
+- `idx_wallets_label` on `wallets(label)`
+
+## Stored Wallet Set Shape
+
+When a wallet set is loaded by the CLI, it materializes into this JSON-like shape:
 
 ```json
 {
@@ -28,7 +74,7 @@ Example:
 
 Fields:
 
-- `set_name`: wallet-set name, also used as the filename
+- `set_name`: wallet-set name
 - `created_at`: ISO-8601 timestamp
 - `network`: `devnet` or `mainnet-beta`
 - `wallets`: array of wallet entries
@@ -39,7 +85,9 @@ Wallet entry fields:
 - `public_key`: wallet public key
 - `secret_key_base58`: base58-encoded Solana secret key
 
-## Standalone Wallet File
+## Portable JSON Input
+
+Primary storage is SQLite, but `bulk-transfer.ts --from <file>` accepts portable JSON input for one-off sources.
 
 `bulk-transfer.ts --from <file>` also accepts a standalone wallet JSON object:
 

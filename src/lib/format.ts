@@ -68,5 +68,11 @@ export function escapeCsvValue(value: string): string {
 }
 
 export function relativeFromCwd(filePath: string): string {
-  return path.relative(process.cwd(), filePath) || ".";
+  const relative = path.relative(process.cwd(), filePath) || ".";
+
+  if (relative === "." || (!relative.startsWith("..") && !path.isAbsolute(relative))) {
+    return relative;
+  }
+
+  return filePath;
 }

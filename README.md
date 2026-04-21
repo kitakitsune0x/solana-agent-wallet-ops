@@ -9,12 +9,13 @@ This is not a consumer wallet app, not a GUI, and not tied to a single host such
 - Local automation and scripting workflows
 - Agent/tool adapters that need wallet creation and transfer utilities
 - Operators testing wallet batches on devnet before mainnet-beta use
-- Teams that want a simple filesystem-backed wallet-set format
+- Teams that want local, scriptable wallet storage without adding external infrastructure
 
 ## Features
 
 - Bulk create Solana wallets and save them as named wallet sets
 - List wallet sets or inspect wallets inside a set
+- Store wallet sets in local SQLite with indexed lookups
 - Check balances in bulk
   - SOL by default
   - SPL token balances when `--mint <TOKEN_MINT>` is provided
@@ -39,12 +40,24 @@ Install dependencies:
 pnpm install
 ```
 
+Optional local build:
+
+```bash
+pnpm build
+```
+
 ## Command Examples
 
 Create a wallet set:
 
 ```bash
 pnpm tsx src/cli/create-wallets.ts --set test-set --count 25 --network devnet
+```
+
+Create a wallet set with an explicit external DB path:
+
+```bash
+pnpm tsx src/cli/create-wallets.ts --set test-set --count 25 --network devnet --db-path ~/.solana-agent-wallet-ops/wallets.sqlite
 ```
 
 List all wallet sets:
@@ -107,31 +120,41 @@ Notes for CSV recipient input:
 - If the CSV omits `amount`, pass a global `--amount`.
 - CSV columns:
   - required: `public_key`
-  - optional: `label`
-  - optional: `amount`
+- optional: `label`
+- optional: `amount`
+
+Storage path overrides:
+
+- default DB path: `~/.solana-agent-wallet-ops/wallets.sqlite`
+- CLI override: `--db-path <path>`
+- env override: `SAWO_DB_PATH=/path/to/wallets.sqlite`
+- repo-local DBs are rejected unless you pass `--allow-repo-db` or set `SAWO_ALLOW_REPO_DB=1`
 
 ## Storage Format
 
-Wallet sets live under:
+Primary wallet storage lives in a local SQLite database:
 
 ```text
-data/wallet-sets/
+~/.solana-agent-wallet-ops/wallets.sqlite
 ```
 
-Each wallet-set JSON file stores:
+The DB contains:
 
-- `set_name`
-- `created_at`
-- `network`
+- `wallet_sets`
 - `wallets`
 
-Each wallet entry stores:
+Each stored wallet entry includes:
 
 - `label`
 - `public_key`
 - `secret_key_base58`
 
-Address exports are intentionally safer and only write:
+For portability, `bulk-transfer --from <file>` still accepts:
+
+- a standalone wallet JSON object
+- a one-wallet wallet-set JSON object
+
+Address exports remain safer and only write:
 
 - `label`
 - `public_key`
@@ -140,7 +163,9 @@ See [docs/storage-format.md](docs/storage-format.md) for examples.
 
 ## Safety Warnings
 
-- Secrets are stored locally in JSON for v1. Treat `data/wallet-sets/` as sensitive material.
+- Secret-bearing storage defaults outside the repo at `~/.solana-agent-wallet-ops/wallets.sqlite`.
+- Repo-local DB paths are blocked unless you opt in with `--allow-repo-db` or `SAWO_ALLOW_REPO_DB=1`.
+- SQLite improves structure and performance. It does not encrypt private keys.
 - Commands do not print secret keys unless `--show-secrets` is explicitly passed.
 - CSV exports never contain secrets.
 - Real transfers require `--execute`.
@@ -153,7 +178,8 @@ More detail: [docs/safety.md](docs/safety.md)
 ## Architecture Choices
 
 - CLI-first TypeScript with `commander` keeps the toolkit scriptable and easy to wrap from different agents.
-- Filesystem JSON storage keeps state local and inspectable without introducing a database.
+- Local SQLite storage keeps state queryable, atomic, and scalable without adding an external service.
+- Secret-bearing storage defaults outside the repo because `gitignore` is not a security boundary.
 - Wallet-set storage is asset-agnostic; SOL and SPL behavior is chosen at command time.
 - SPL support is intentionally mint-driven instead of symbol-driven. The CLI fetches mint decimals on-chain and derives associated token accounts deterministically.
 - Transfer execution is serial in v1 so failures are easier to reason about and partial completion is visible.
