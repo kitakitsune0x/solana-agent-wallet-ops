@@ -13,7 +13,7 @@
     "release:status": "changeset status --verbose",
     "release:version": "changeset version",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test test/**/*.test.ts",
+    "test": "node --import tsx --test test/*.test.ts",
     "create-wallets": "tsx src/cli/create-wallets.ts",
     "import-wallets": "tsx src/cli/import-wallets.ts",
     "list-wallets": "tsx src/cli/list-wallets.ts",
